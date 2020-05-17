@@ -20,17 +20,15 @@
 // Choose default implementation if not already configured by turf_userconfig.h:
 #if !defined(TURF_C_IMPL_ATOMIC_PATH)
     #if TURF_COMPILER_MSVC
-        #define TURF_C_IMPL_ATOMIC_PATH "turf/c/impl/atomic_msvc.h"
+        #include "turf/c/impl/atomic_msvc.h"
     #elif TURF_COMPILER_GCC && (TURF_CPU_X86 || TURF_CPU_X64)
-        #define TURF_C_IMPL_ATOMIC_PATH "turf/c/impl/atomic_gcc_x86-64.h"
+        #include "turf/c/impl/atomic_gcc_x86-64.h"
     #elif TURF_COMPILER_GCC && TURF_CPU_ARM
-        #define TURF_C_IMPL_ATOMIC_PATH "turf/c/impl/atomic_gcc_arm.h"
+        #include "turf/c/impl/atomic_gcc_arm.h"
     #else
         #define TURF_C_IMPL_ATOMIC_PATH "*** Unable to select a default Atomic implementation ***"
     #endif
 #endif
-
-#include TURF_C_IMPL_ATOMIC_PATH
 
 #ifdef __cplusplus
 extern "C" {

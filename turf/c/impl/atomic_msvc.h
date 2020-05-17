@@ -57,7 +57,19 @@ typedef struct { void* nonatomic; } turf_atomicPtr_t;
 #define turf_threadFenceConsume() (0)
 #define turf_threadFenceAcquire() _ReadWriteBarrier()
 #define turf_threadFenceRelease() _ReadWriteBarrier()
-#define turf_threadFenceSeqCst() MemoryBarrier()
+#if (TURF_PTR_SIZE == 8)
+#define turf_threadFenceSeqCst() __faststorefence()
+#else
+// refer to https://docs.microsoft.com/en-us/windows/win32/api/winnt/nf-winnt-memorybarrier
+__inline void turf_threadFenceSeqCst (void)
+{
+    long Barrier;
+    __asm {
+        xchg Barrier, eax
+    }
+}
+
+#endif
 #endif
 
 //----------------------------------------------
@@ -238,12 +250,12 @@ TURF_C_INLINE void turf_store64Relaxed(turf_atomic64_t* object, uint64_t value) 
 
 TURF_C_INLINE uint64_t turf_compareExchange64Relaxed(turf_atomic64_t* object, uint64_t expected, uint64_t desired) {
     // Or make 2 versions of function? (Only if there's an advantage for GCC.)
-    return _InterlockedCompareExchange64((LONGLONG*) object, desired, expected);
+    return _InterlockedCompareExchange64((uint64_t*) object, desired, expected);
 }
 
 TURF_C_INLINE intreg_t turf_compareExchangeWeak64Relaxed(turf_atomic64_t* object, uint64_t* expected, uint64_t desired) {
     uint64_t e = *expected;
-    uint64_t previous = _InterlockedCompareExchange64((LONGLONG*) object, desired, e);
+    uint64_t previous = _InterlockedCompareExchange64((uint64_t*) object, desired, e);
     intreg_t matched = (previous == e);
     if (!matched)
         *expected = previous;
@@ -252,7 +264,7 @@ TURF_C_INLINE intreg_t turf_compareExchangeWeak64Relaxed(turf_atomic64_t* object
 
 TURF_C_INLINE uint64_t turf_exchange64Relaxed(turf_atomic64_t* object, uint64_t desired) {
 #if (TURF_PTR_SIZE == 8) || TURF_TARGET_XBOX_360
-    return _InterlockedExchange64((LONGLONG*) object, desired);
+    return _InterlockedExchange64((uint64_t*) object, desired);
 #else
     // It would be cool to check the zero flag, which is set by lock cmpxchg8b, to
     // know whether the CAS succeeded,
@@ -261,7 +273,7 @@ TURF_C_INLINE uint64_t turf_exchange64Relaxed(turf_atomic64_t* object, uint64_t 
     // Let's just re-compare the result with the previous instead.
     uint64_t expected = object->nonatomic;
     for (;;) {
-        uint64_t previous = _InterlockedCompareExchange64((LONGLONG*) object, desired, expected);
+        uint64_t previous = _InterlockedCompareExchange64((uint64_t*) object, desired, expected);
         if (previous == expected)
             return previous;
         expected = previous;
@@ -271,11 +283,11 @@ TURF_C_INLINE uint64_t turf_exchange64Relaxed(turf_atomic64_t* object, uint64_t 
 
 TURF_C_INLINE uint64_t turf_fetchAdd64Relaxed(turf_atomic64_t* object, int64_t operand) {
 #if (TURF_PTR_SIZE == 8) || TURF_TARGET_XBOX_360
-    return _InterlockedExchangeAdd64((LONGLONG*) object, operand);
+    return _InterlockedExchangeAdd64((uint64_t*) object, operand);
 #else
     uint64_t expected = object->nonatomic;
     for (;;) {
-        uint64_t previous = _InterlockedCompareExchange64((LONGLONG*) object, expected + operand, expected);
+        uint64_t previous = _InterlockedCompareExchange64((uint64_t*) object, expected + operand, expected);
         if (previous == expected)
             return previous;
         expected = previous;
@@ -285,11 +297,11 @@ TURF_C_INLINE uint64_t turf_fetchAdd64Relaxed(turf_atomic64_t* object, int64_t o
 
 TURF_C_INLINE uint64_t turf_fetchAnd64Relaxed(turf_atomic64_t* object, uint64_t operand) {
 #if (TURF_PTR_SIZE == 8) || TURF_TARGET_XBOX_360
-    return _InterlockedAnd64((LONGLONG*) object, operand);
+    return _InterlockedAnd64((uint64_t*) object, operand);
 #else
     uint64_t expected = object->nonatomic;
     for (;;) {
-        uint64_t previous = _InterlockedCompareExchange64((LONGLONG*) object, expected & operand, expected);
+        uint64_t previous = _InterlockedCompareExchange64((uint64_t*) object, expected & operand, expected);
         if (previous == expected)
             return previous;
         expected = previous;
@@ -299,11 +311,11 @@ TURF_C_INLINE uint64_t turf_fetchAnd64Relaxed(turf_atomic64_t* object, uint64_t 
 
 TURF_C_INLINE uint64_t turf_fetchOr64Relaxed(turf_atomic64_t* object, uint64_t operand) {
 #if (TURF_PTR_SIZE == 8) || TURF_TARGET_XBOX_360
-    return _InterlockedOr64((LONGLONG*) object, operand);
+    return _InterlockedOr64((uint64_t*) object, operand);
 #else
     uint64_t expected = object->nonatomic;
     for (;;) {
-        uint64_t previous = _InterlockedCompareExchange64((LONGLONG*) object, expected | operand, expected);
+        uint64_t previous = _InterlockedCompareExchange64((uint64_t*) object, expected | operand, expected);
         if (previous == expected)
             return previous;
         expected = previous;
